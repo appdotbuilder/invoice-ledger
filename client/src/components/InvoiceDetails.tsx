@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { trpc } from '@/utils/trpc';
 import { useState } from 'react';
-import { Edit2, Save, X, Trash2, Plus, Calculator, Calendar, User, DollarSign } from 'lucide-react';
+import { Edit2, Save, X, Trash2, Plus, Calculator, Calendar, User, DollarSign, Printer } from 'lucide-react';
 import type { InvoiceWithLineItems, UpdateInvoiceInput, UpdateLineItemInput, PaymentStatus } from '../../../server/src/schema';
 
 interface InvoiceDetailsProps {
@@ -139,6 +139,264 @@ export function InvoiceDetails({ invoice, onUpdate }: InvoiceDetailsProps) {
     }
   };
 
+  const handlePrint = () => {
+    // Create print data object to pass to the new window
+    const printData = {
+      invoice: {
+        id: invoice.id,
+        client_name: invoice.client_name,
+        date: invoice.date.toISOString(),
+        due_date: invoice.due_date.toISOString(),
+        total_amount: invoice.total_amount,
+        payment_status: invoice.payment_status,
+        created_at: invoice.created_at.toISOString(),
+        line_items: invoice.line_items.map(item => ({
+          id: item.id,
+          description: item.description,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          total: item.total
+        }))
+      }
+    };
+
+    // Open new window for print view
+    const printWindow = window.open('about:blank', '_blank');
+    if (printWindow) {
+      printWindow.document.write(generatePrintHTML(printData.invoice));
+      printWindow.document.close();
+      
+      // Wait for content to load, then trigger print
+      setTimeout(() => {
+        printWindow.print();
+      }, 500);
+    }
+  };
+
+  const generatePrintHTML = (invoiceData: any) => {
+    return `
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Invoice INV-${String(invoiceData.id).padStart(4, '0')}</title>
+        <style>
+          @media print {
+            body { margin: 0; }
+            .no-print { display: none !important; }
+            .page-break { page-break-before: always; }
+          }
+          
+          * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+          }
+          
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.5;
+            color: #000;
+            background: #fff;
+            padding: 40px;
+            max-width: 800px;
+            margin: 0 auto;
+          }
+          
+          .invoice-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 40px;
+            border-bottom: 2px solid #000;
+            padding-bottom: 20px;
+          }
+          
+          .invoice-title {
+            font-size: 28px;
+            font-weight: bold;
+            color: #000;
+          }
+          
+          .invoice-number {
+            font-size: 18px;
+            color: #666;
+            margin-top: 5px;
+          }
+          
+          .invoice-status {
+            text-align: right;
+          }
+          
+          .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+            border: 1px solid #000;
+          }
+          
+          .status-pending { background: #f3f4f6; color: #374151; }
+          .status-paid { background: #d1fae5; color: #065f46; }
+          .status-overdue { background: #fecaca; color: #991b1b; }
+          
+          .invoice-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            margin-bottom: 40px;
+          }
+          
+          .detail-section h3 {
+            font-size: 14px;
+            font-weight: bold;
+            color: #666;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+          }
+          
+          .detail-section p {
+            font-size: 16px;
+            margin-bottom: 8px;
+          }
+          
+          .line-items {
+            margin-bottom: 40px;
+          }
+          
+          .line-items h3 {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            color: #000;
+          }
+          
+          .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+          }
+          
+          .items-table th,
+          .items-table td {
+            text-align: left;
+            padding: 12px 8px;
+            border-bottom: 1px solid #e5e7eb;
+          }
+          
+          .items-table th {
+            background: #f9fafb;
+            font-weight: bold;
+            font-size: 12px;
+            text-transform: uppercase;
+            color: #666;
+          }
+          
+          .items-table td {
+            font-size: 14px;
+          }
+          
+          .text-right {
+            text-align: right;
+          }
+          
+          .total-section {
+            border-top: 2px solid #000;
+            padding-top: 20px;
+            text-align: right;
+          }
+          
+          .total-amount {
+            font-size: 24px;
+            font-weight: bold;
+            color: #000;
+          }
+          
+          .print-date {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #e5e7eb;
+            font-size: 12px;
+            color: #666;
+            text-align: center;
+          }
+          
+          @media screen {
+            body {
+              box-shadow: 0 0 20px rgba(0,0,0,0.1);
+              border-radius: 8px;
+            }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="invoice-header">
+          <div>
+            <h1 class="invoice-title">INVOICE</h1>
+            <div class="invoice-number">INV-${String(invoiceData.id).padStart(4, '0')}</div>
+          </div>
+          <div class="invoice-status">
+            <span class="status-badge status-${invoiceData.payment_status}">
+              ${invoiceData.payment_status}
+            </span>
+          </div>
+        </div>
+
+        <div class="invoice-details">
+          <div class="detail-section">
+            <h3>Bill To</h3>
+            <p><strong>${invoiceData.client_name}</strong></p>
+          </div>
+          
+          <div class="detail-section">
+            <h3>Invoice Details</h3>
+            <p><strong>Invoice Date:</strong> ${new Date(invoiceData.date).toLocaleDateString()}</p>
+            <p><strong>Due Date:</strong> ${new Date(invoiceData.due_date).toLocaleDateString()}</p>
+            <p><strong>Created:</strong> ${new Date(invoiceData.created_at).toLocaleDateString()}</p>
+          </div>
+        </div>
+
+        <div class="line-items">
+          <h3>Items</h3>
+          <table class="items-table">
+            <thead>
+              <tr>
+                <th>Description</th>
+                <th class="text-right">Quantity</th>
+                <th class="text-right">Unit Price</th>
+                <th class="text-right">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${invoiceData.line_items.map((item: any) => `
+                <tr>
+                  <td>${item.description}</td>
+                  <td class="text-right">${item.quantity}</td>
+                  <td class="text-right">$${item.unit_price.toFixed(2)}</td>
+                  <td class="text-right">$${item.total.toFixed(2)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          
+          <div class="total-section">
+            <div class="total-amount">
+              Total: $${invoiceData.total_amount.toFixed(2)}
+            </div>
+          </div>
+        </div>
+
+        <div class="print-date">
+          Printed on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}
+        </div>
+      </body>
+      </html>
+    `;
+  };
+
   return (
     <div className="space-y-6">
       {/* Header Actions */}
@@ -177,10 +435,16 @@ export function InvoiceDetails({ invoice, onUpdate }: InvoiceDetailsProps) {
               </Button>
             </>
           ) : (
-            <Button onClick={() => setIsEditing(true)} variant="outline" size="sm">
-              <Edit2 className="h-4 w-4 mr-1" />
-              Edit
-            </Button>
+            <>
+              <Button onClick={handlePrint} variant="outline" size="sm">
+                <Printer className="h-4 w-4 mr-1" />
+                Print
+              </Button>
+              <Button onClick={() => setIsEditing(true)} variant="outline" size="sm">
+                <Edit2 className="h-4 w-4 mr-1" />
+                Edit
+              </Button>
+            </>
           )}
           
           <AlertDialog>
