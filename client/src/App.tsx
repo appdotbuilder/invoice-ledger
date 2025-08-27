@@ -3,7 +3,7 @@ import { Toaster } from 'sonner';
 import { InvoiceListPage } from '@/components/InvoiceListPage';
 import { NewInvoicePage } from '@/components/NewInvoicePage';
 
-type AppView = 'list' | 'new' | 'details';
+type AppView = 'list' | 'new';
 
 function App() {
   const [currentView, setCurrentView] = useState<AppView>('list');

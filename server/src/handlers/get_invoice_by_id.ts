@@ -5,7 +5,7 @@ import { type InvoiceWithLineItems } from '../schema';
 
 export const getInvoiceById = async (id: number): Promise<InvoiceWithLineItems | null> => {
   try {
-    // Get the invoice
+    // Get invoice
     const invoiceResults = await db.select()
       .from(invoicesTable)
       .where(eq(invoicesTable.id, id))
@@ -17,8 +17,8 @@ export const getInvoiceById = async (id: number): Promise<InvoiceWithLineItems |
 
     const invoice = invoiceResults[0];
 
-    // Get the line items for this invoice
-    const lineItemsResults = await db.select()
+    // Get line items
+    const lineItemResults = await db.select()
       .from(lineItemsTable)
       .where(eq(lineItemsTable.invoice_id, id))
       .execute();
@@ -27,7 +27,7 @@ export const getInvoiceById = async (id: number): Promise<InvoiceWithLineItems |
     return {
       ...invoice,
       total_amount: parseFloat(invoice.total_amount), // Convert string back to number
-      line_items: lineItemsResults.map(item => ({
+      line_items: lineItemResults.map(item => ({
         ...item,
         unit_price: parseFloat(item.unit_price), // Convert string back to number
         total: parseFloat(item.total) // Convert string back to number

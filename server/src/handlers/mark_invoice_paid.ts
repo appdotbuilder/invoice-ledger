@@ -18,11 +18,12 @@ export const markInvoicePaid = async (input: MarkInvoicePaidInput): Promise<Invo
       throw new Error(`Invoice with id ${input.id} not found`);
     }
 
-    // Convert numeric fields back to numbers before returning
     const invoice = result[0];
+
+    // Convert numeric fields back to numbers before returning
     return {
       ...invoice,
-      total_amount: parseFloat(invoice.total_amount) // Convert string back to number
+      total_amount: parseFloat(invoice.total_amount)
     };
   } catch (error) {
     console.error('Failed to mark invoice as paid:', error);

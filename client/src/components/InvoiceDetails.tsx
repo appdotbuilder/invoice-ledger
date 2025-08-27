@@ -140,30 +140,48 @@ export function InvoiceDetails({ invoice, onUpdate }: InvoiceDetailsProps) {
   };
 
   const handlePrint = () => {
-    // Create print data object to pass to the new window
+    // Calculate VAT components (assuming current amounts are exclusive of VAT)
+    const vatRate = 0.05; // 5% VAT for UAE
+    
+    // Calculate totals for the invoice
+    const totalAmountExclusiveVat = invoice.total_amount;
+    const vatAmount = totalAmountExclusiveVat * vatRate;
+    const totalAmountInclusiveVat = totalAmountExclusiveVat + vatAmount;
+    
+    // Create comprehensive print data object with VAT calculations
     const printData = {
-      invoice: {
-        id: invoice.id,
-        client_name: invoice.client_name,
-        date: invoice.date.toISOString(),
-        due_date: invoice.due_date.toISOString(),
-        total_amount: invoice.total_amount,
-        payment_status: invoice.payment_status,
-        created_at: invoice.created_at.toISOString(),
-        line_items: invoice.line_items.map(item => ({
+      id: invoice.id,
+      client_name: invoice.client_name,
+      date: invoice.date,
+      due_date: invoice.due_date,
+      total_amount: invoice.total_amount,
+      total_amount_exclusive_vat: totalAmountExclusiveVat,
+      vat_amount: vatAmount,
+      total_amount_inclusive_vat: totalAmountInclusiveVat,
+      payment_status: invoice.payment_status,
+      created_at: invoice.created_at,
+      line_items: invoice.line_items.map(item => {
+        const totalExclusiveVat = item.total;
+        const itemVatAmount = totalExclusiveVat * vatRate;
+        const totalInclusiveVat = totalExclusiveVat + itemVatAmount;
+        
+        return {
           id: item.id,
           description: item.description,
           quantity: item.quantity,
           unit_price: item.unit_price,
-          total: item.total
-        }))
-      }
+          total: item.total,
+          total_exclusive_vat: totalExclusiveVat,
+          vat_amount: itemVatAmount,
+          total_inclusive_vat: totalInclusiveVat
+        };
+      })
     };
 
     // Open new window for print view
     const printWindow = window.open('about:blank', '_blank');
     if (printWindow) {
-      printWindow.document.write(generatePrintHTML(printData.invoice));
+      printWindow.document.write(generatePrintHTML(printData));
       printWindow.document.close();
       
       // Wait for content to load, then trigger print
@@ -180,7 +198,7 @@ export function InvoiceDetails({ invoice, onUpdate }: InvoiceDetailsProps) {
       <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Invoice INV-${String(invoiceData.id).padStart(4, '0')}</title>
+        <title>Tax Invoice INV-${String(invoiceData.id).padStart(4, '0')}</title>
         <style>
           @media print {
             body { margin: 0; }
@@ -196,138 +214,223 @@ export function InvoiceDetails({ invoice, onUpdate }: InvoiceDetailsProps) {
           
           body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            line-height: 1.5;
+            line-height: 1.4;
             color: #000;
             background: #fff;
-            padding: 40px;
-            max-width: 800px;
+            padding: 30px;
+            max-width: 900px;
             margin: 0 auto;
+            font-size: 14px;
           }
           
           .invoice-header {
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            margin-bottom: 40px;
-            border-bottom: 2px solid #000;
+            margin-bottom: 30px;
+            border-bottom: 3px solid #2563eb;
             padding-bottom: 20px;
           }
           
-          .invoice-title {
-            font-size: 28px;
+          .tax-invoice-title {
+            font-size: 32px;
             font-weight: bold;
-            color: #000;
+            color: #2563eb;
+            margin-bottom: 5px;
           }
           
           .invoice-number {
-            font-size: 18px;
+            font-size: 16px;
             color: #666;
-            margin-top: 5px;
-          }
-          
-          .invoice-status {
-            text-align: right;
+            font-weight: 500;
           }
           
           .status-badge {
             display: inline-block;
-            padding: 4px 12px;
-            border-radius: 4px;
+            padding: 6px 16px;
+            border-radius: 6px;
             font-size: 12px;
             font-weight: bold;
             text-transform: uppercase;
-            border: 1px solid #000;
           }
           
-          .status-pending { background: #f3f4f6; color: #374151; }
-          .status-paid { background: #d1fae5; color: #065f46; }
-          .status-overdue { background: #fecaca; color: #991b1b; }
+          .status-pending { background: #fef3c7; color: #92400e; border: 1px solid #f59e0b; }
+          .status-paid { background: #d1fae5; color: #065f46; border: 1px solid #10b981; }
+          .status-overdue { background: #fecaca; color: #991b1b; border: 1px solid #ef4444; }
           
-          .invoice-details {
+          .company-info {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 40px;
-            margin-bottom: 40px;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8fafc;
+            border-radius: 8px;
           }
           
-          .detail-section h3 {
-            font-size: 14px;
-            font-weight: bold;
-            color: #666;
-            text-transform: uppercase;
-            margin-bottom: 10px;
+          .supplier-info, .customer-info {
+            border: 1px solid #e2e8f0;
+            padding: 20px;
+            border-radius: 6px;
+            background: white;
           }
           
-          .detail-section p {
+          .section-title {
             font-size: 16px;
+            font-weight: bold;
+            color: #2563eb;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+          }
+          
+          .company-name {
+            font-size: 18px;
+            font-weight: bold;
             margin-bottom: 8px;
           }
           
-          .line-items {
-            margin-bottom: 40px;
+          .company-address, .company-trn, .client-name, .client-address, .client-trn {
+            margin-bottom: 4px;
+            color: #374151;
           }
           
-          .line-items h3 {
-            font-size: 18px;
-            font-weight: bold;
-            margin-bottom: 20px;
-            color: #000;
+          .invoice-meta {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f1f5f9;
+            border-radius: 8px;
           }
           
-          .items-table {
+          .meta-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            padding: 4px 0;
+          }
+          
+          .meta-label {
+            font-weight: 600;
+            color: #475569;
+          }
+          
+          .meta-value {
+            color: #1e293b;
+          }
+          
+          .line-items-table {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            overflow: hidden;
           }
           
-          .items-table th,
-          .items-table td {
-            text-align: left;
-            padding: 12px 8px;
-            border-bottom: 1px solid #e5e7eb;
-          }
-          
-          .items-table th {
-            background: #f9fafb;
-            font-weight: bold;
+          .line-items-table th {
+            background: #2563eb;
+            color: white;
+            padding: 15px 10px;
+            font-weight: 600;
             font-size: 12px;
             text-transform: uppercase;
-            color: #666;
+            letter-spacing: 0.5px;
+            text-align: center;
           }
           
-          .items-table td {
-            font-size: 14px;
+          .line-items-table td {
+            padding: 12px 10px;
+            border-bottom: 1px solid #e2e8f0;
+            vertical-align: top;
+          }
+          
+          .line-items-table tbody tr:nth-child(even) {
+            background: #f8fafc;
+          }
+          
+          .line-items-table tbody tr:hover {
+            background: #e2e8f0;
           }
           
           .text-right {
             text-align: right;
           }
           
-          .total-section {
-            border-top: 2px solid #000;
-            padding-top: 20px;
+          .text-center {
+            text-align: center;
+          }
+          
+          .financial-summary {
+            margin: 30px 0;
+            padding: 25px;
+            background: #f8fafc;
+            border: 2px solid #2563eb;
+            border-radius: 8px;
             text-align: right;
           }
           
-          .total-amount {
-            font-size: 24px;
-            font-weight: bold;
-            color: #000;
+          .financial-summary p {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-size: 15px;
           }
           
-          .print-date {
+          .financial-summary h3 {
+            display: flex;
+            justify-content: space-between;
+            font-size: 20px;
+            color: #2563eb;
+            border-top: 2px solid #2563eb;
+            padding-top: 15px;
+            margin-top: 15px;
+          }
+          
+          .payment-details {
+            margin: 30px 0;
+            padding: 20px;
+            background: #fef7ff;
+            border: 1px solid #d8b4fe;
+            border-radius: 8px;
+          }
+          
+          .payment-details h3 {
+            color: #7c3aed;
+            margin-bottom: 15px;
+            font-size: 16px;
+          }
+          
+          .payment-details p {
+            margin-bottom: 6px;
+            color: #374151;
+          }
+          
+          .footer-info {
             margin-top: 40px;
             padding-top: 20px;
             border-top: 1px solid #e5e7eb;
             font-size: 12px;
-            color: #666;
+            color: #6b7280;
             text-align: center;
+          }
+          
+          .tax-note {
+            background: #fef9e7;
+            border: 1px solid #f59e0b;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 20px 0;
+            font-size: 13px;
+            color: #92400e;
           }
           
           @media screen {
             body {
-              box-shadow: 0 0 20px rgba(0,0,0,0.1);
-              border-radius: 8px;
+              box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+              border-radius: 12px;
             }
           }
         </style>
@@ -335,62 +438,120 @@ export function InvoiceDetails({ invoice, onUpdate }: InvoiceDetailsProps) {
       <body>
         <div class="invoice-header">
           <div>
-            <h1 class="invoice-title">INVOICE</h1>
+            <h1 class="tax-invoice-title">TAX INVOICE</h1>
             <div class="invoice-number">INV-${String(invoiceData.id).padStart(4, '0')}</div>
           </div>
-          <div class="invoice-status">
+          <div>
             <span class="status-badge status-${invoiceData.payment_status}">
-              ${invoiceData.payment_status}
+              ${invoiceData.payment_status.toUpperCase()}
             </span>
           </div>
         </div>
 
-        <div class="invoice-details">
-          <div class="detail-section">
-            <h3>Bill To</h3>
-            <p><strong>${invoiceData.client_name}</strong></p>
+        <div class="company-info">
+          <div class="supplier-info">
+            <h3 class="section-title">From (Supplier)</h3>
+            <p class="company-name">[Your Company Name]</p>
+            <p class="company-address">[Your Company Address]</p>
+            <p class="company-address">[City, Emirate, UAE]</p>
+            <p class="company-trn"><strong>TRN:</strong> [Your TRN Number]</p>
           </div>
           
-          <div class="detail-section">
-            <h3>Invoice Details</h3>
-            <p><strong>Invoice Date:</strong> ${new Date(invoiceData.date).toLocaleDateString()}</p>
-            <p><strong>Due Date:</strong> ${new Date(invoiceData.due_date).toLocaleDateString()}</p>
-            <p><strong>Created:</strong> ${new Date(invoiceData.created_at).toLocaleDateString()}</p>
+          <div class="customer-info">
+            <h3 class="section-title">Bill To (Customer)</h3>
+            <p class="client-name"><strong>${invoiceData.client_name}</strong></p>
+            <p class="client-address">[Client Address]</p>
+            <p class="client-address">[City, Emirate, UAE]</p>
+            <p class="client-trn"><strong>TRN:</strong> [Client TRN Number]</p>
           </div>
         </div>
 
-        <div class="line-items">
-          <h3>Items</h3>
-          <table class="items-table">
-            <thead>
-              <tr>
-                <th>Description</th>
-                <th class="text-right">Quantity</th>
-                <th class="text-right">Unit Price</th>
-                <th class="text-right">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${invoiceData.line_items.map((item: any) => `
-                <tr>
-                  <td>${item.description}</td>
-                  <td class="text-right">${item.quantity}</td>
-                  <td class="text-right">$${item.unit_price.toFixed(2)}</td>
-                  <td class="text-right">$${item.total.toFixed(2)}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
+        <div class="invoice-meta">
+          <div>
+            <div class="meta-item">
+              <span class="meta-label">Invoice No:</span>
+              <span class="meta-value">INV-${String(invoiceData.id).padStart(4, '0')}</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Date of Issue:</span>
+              <span class="meta-value">${new Date(invoiceData.date).toLocaleDateString('en-AE')}</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Date of Supply:</span>
+              <span class="meta-value">${new Date(invoiceData.date).toLocaleDateString('en-AE')} (Assumed)</span>
+            </div>
+          </div>
           
-          <div class="total-section">
-            <div class="total-amount">
-              Total: $${invoiceData.total_amount.toFixed(2)}
+          <div>
+            <div class="meta-item">
+              <span class="meta-label">Due Date:</span>
+              <span class="meta-value">${new Date(invoiceData.due_date).toLocaleDateString('en-AE')}</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Status:</span>
+              <span class="meta-value">
+                <span class="status-badge status-${invoiceData.payment_status}">${invoiceData.payment_status.toUpperCase()}</span>
+              </span>
             </div>
           </div>
         </div>
 
-        <div class="print-date">
-          Printed on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}
+        <table class="line-items-table">
+          <thead>
+            <tr>
+              <th style="width: 40%; text-align: left;">Description</th>
+              <th style="width: 8%;">Qty</th>
+              <th style="width: 15%;">Unit Price<br/>(Excl. VAT)</th>
+              <th style="width: 8%;">VAT Rate</th>
+              <th style="width: 14%;">VAT Amount</th>
+              <th style="width: 15%;">Total<br/>(Incl. VAT)</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${invoiceData.line_items.map((item: any) => `
+              <tr>
+                <td style="text-align: left;"><strong>${item.description}</strong></td>
+                <td class="text-center">${item.quantity}</td>
+                <td class="text-right">AED ${item.unit_price.toFixed(2)}</td>
+                <td class="text-center">5%</td>
+                <td class="text-right">AED ${(item.total_exclusive_vat * 0.05).toFixed(2)}</td>
+                <td class="text-right"><strong>AED ${(item.total_exclusive_vat * 1.05).toFixed(2)}</strong></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+
+        <div class="tax-note">
+          <strong>Note:</strong> This invoice is subject to UAE VAT at the standard rate of 5%. 
+          VAT amounts are calculated on the supply value exclusive of VAT.
+        </div>
+
+        <div class="financial-summary">
+          <p>
+            <span><strong>Subtotal (Excl. VAT):</strong></span>
+            <span><strong>AED ${invoiceData.total_amount_exclusive_vat.toFixed(2)}</strong></span>
+          </p>
+          <p>
+            <span><strong>Total VAT (5%):</strong></span>
+            <span><strong>AED ${invoiceData.vat_amount.toFixed(2)}</strong></span>
+          </p>
+          <h3>
+            <span><strong>Total Amount Due (Incl. VAT):</strong></span>
+            <span><strong>AED ${invoiceData.total_amount_inclusive_vat.toFixed(2)}</strong></span>
+          </h3>
+        </div>
+
+        <div class="payment-details">
+          <h3>Payment Information:</h3>
+          <p><strong>Bank Name:</strong> [Your Bank Name]</p>
+          <p><strong>Account No:</strong> [Your Account Number]</p>
+          <p><strong>IBAN:</strong> [Your IBAN Number]</p>
+          <p><strong>SWIFT Code:</strong> [Your SWIFT Code]</p>
+        </div>
+
+        <div class="footer-info">
+          <p>This is a computer-generated tax invoice. No signature is required.</p>
+          <p>Generated on ${new Date().toLocaleDateString('en-AE')} at ${new Date().toLocaleTimeString('en-AE')}</p>
         </div>
       </body>
       </html>

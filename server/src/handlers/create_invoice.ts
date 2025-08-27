@@ -17,7 +17,7 @@ export const createInvoice = async (input: CreateInvoiceInput): Promise<InvoiceW
         date: input.date,
         due_date: input.due_date,
         total_amount: totalAmount.toString(), // Convert number to string for numeric column
-        payment_status: input.payment_status
+        payment_status: input.payment_status || 'pending'
       })
       .returning()
       .execute();
