@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { trpc } from '@/utils/trpc';
 import { useState, useEffect, useCallback } from 'react';
 import { Plus, FileText, Calendar, DollarSign, Filter } from 'lucide-react';
+import { Toaster } from 'sonner';
 import { InvoiceForm } from '@/components/InvoiceForm';
 import { InvoiceDetails } from '@/components/InvoiceDetails';
 import type { Invoice, InvoiceWithLineItems } from '../../server/src/schema';
@@ -77,6 +78,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <Toaster />
       {/* Header */}
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

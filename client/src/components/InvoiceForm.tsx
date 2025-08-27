@@ -4,93 +4,77 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { trpc } from '@/utils/trpc';
-import { useState } from 'react';
+import { useForm, Controller, useFieldArray } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { toast } from 'sonner';
 import { Plus, Trash2, Calculator } from 'lucide-react';
-import type { CreateInvoiceInput, CreateLineItemInput, PaymentStatus } from '../../../server/src/schema';
+import type { CreateInvoiceInput, PaymentStatus } from '../../../server/src/schema';
+import { createInvoiceInputSchema } from '../../../server/src/schema';
 
 interface InvoiceFormProps {
   onSuccess: () => void;
 }
 
 export function InvoiceForm({ onSuccess }: InvoiceFormProps) {
-  const [isLoading, setIsLoading] = useState(false);
-  const [formData, setFormData] = useState<CreateInvoiceInput>({
-    client_name: '',
-    date: new Date(),
-    due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
-    line_items: [
-      {
-        description: '',
-        quantity: 1,
-        unit_price: 0
-      }
-    ],
-    payment_status: 'pending' as PaymentStatus
-  });
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    
-    try {
-      await trpc.createInvoice.mutate(formData);
-      onSuccess();
-      
-      // Reset form
-      setFormData({
-        client_name: '',
-        date: new Date(),
-        due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-        line_items: [
-          {
-            description: '',
-            quantity: 1,
-            unit_price: 0
-          }
-        ],
-        payment_status: 'pending'
-      });
-    } catch (error) {
-      console.error('Failed to create invoice:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const addLineItem = () => {
-    setFormData((prev: CreateInvoiceInput) => ({
-      ...prev,
+  const {
+    register,
+    control,
+    handleSubmit,
+    watch,
+    reset,
+    formState: { errors, isSubmitting }
+  } = useForm<CreateInvoiceInput>({
+    resolver: zodResolver(createInvoiceInputSchema),
+    defaultValues: {
+      client_name: '',
+      date: new Date(),
+      due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
       line_items: [
-        ...prev.line_items,
         {
           description: '',
           quantity: 1,
           unit_price: 0
         }
-      ]
-    }));
-  };
+      ],
+      payment_status: 'pending' as PaymentStatus
+    }
+  });
 
-  const removeLineItem = (index: number) => {
-    if (formData.line_items.length > 1) {
-      setFormData((prev: CreateInvoiceInput) => ({
-        ...prev,
-        line_items: prev.line_items.filter((_, i) => i !== index)
-      }));
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: 'line_items'
+  });
+
+  const watchedLineItems = watch('line_items');
+
+  const onSubmit = async (data: CreateInvoiceInput) => {
+    try {
+      await trpc.createInvoice.mutate(data);
+      toast.success('Invoice created successfully!');
+      onSuccess();
+      reset();
+    } catch (error) {
+      console.error('Failed to create invoice:', error);
+      toast.error('Failed to create invoice. Please try again.');
     }
   };
 
-  const updateLineItem = (index: number, field: keyof CreateLineItemInput, value: string | number) => {
-    setFormData((prev: CreateInvoiceInput) => ({
-      ...prev,
-      line_items: prev.line_items.map((item, i) =>
-        i === index ? { ...item, [field]: value } : item
-      )
-    }));
+  const addLineItem = () => {
+    append({
+      description: '',
+      quantity: 1,
+      unit_price: 0
+    });
+  };
+
+  const removeLineItem = (index: number) => {
+    if (fields.length > 1) {
+      remove(index);
+    }
   };
 
   const calculateTotal = () => {
-    return formData.line_items.reduce(
+    return watchedLineItems.reduce(
       (sum, item) => sum + (item.quantity * item.unit_price),
       0
     );
@@ -101,7 +85,7 @@ export function InvoiceForm({ onSuccess }: InvoiceFormProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       {/* Basic Invoice Information */}
       <Card>
         <CardHeader>
@@ -113,32 +97,35 @@ export function InvoiceForm({ onSuccess }: InvoiceFormProps) {
               <Label htmlFor="client_name">Client Name</Label>
               <Input
                 id="client_name"
-                value={formData.client_name}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                  setFormData((prev: CreateInvoiceInput) => ({ ...prev, client_name: e.target.value }))
-                }
+                {...register('client_name')}
                 placeholder="Enter client name"
-                required
               />
+              {errors.client_name && (
+                <p className="text-sm text-red-600">{errors.client_name.message}</p>
+              )}
             </div>
             
             <div className="space-y-2">
               <Label htmlFor="payment_status">Payment Status</Label>
-              <Select
-                value={formData.payment_status}
-                onValueChange={(value: PaymentStatus) =>
-                  setFormData((prev: CreateInvoiceInput) => ({ ...prev, payment_status: value }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="paid">Paid</SelectItem>
-                  <SelectItem value="overdue">Overdue</SelectItem>
-                </SelectContent>
-              </Select>
+              <Controller
+                control={control}
+                name="payment_status"
+                render={({ field }) => (
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="paid">Paid</SelectItem>
+                      <SelectItem value="overdue">Overdue</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              {errors.payment_status && (
+                <p className="text-sm text-red-600">{errors.payment_status.message}</p>
+              )}
             </div>
           </div>
           
@@ -148,12 +135,11 @@ export function InvoiceForm({ onSuccess }: InvoiceFormProps) {
               <Input
                 id="date"
                 type="date"
-                value={formatDateForInput(formData.date)}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                  setFormData((prev: CreateInvoiceInput) => ({ ...prev, date: new Date(e.target.value) }))
-                }
-                required
+                {...register('date', { valueAsDate: true })}
               />
+              {errors.date && (
+                <p className="text-sm text-red-600">{errors.date.message}</p>
+              )}
             </div>
             
             <div className="space-y-2">
@@ -161,12 +147,11 @@ export function InvoiceForm({ onSuccess }: InvoiceFormProps) {
               <Input
                 id="due_date"
                 type="date"
-                value={formatDateForInput(formData.due_date)}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                  setFormData((prev: CreateInvoiceInput) => ({ ...prev, due_date: new Date(e.target.value) }))
-                }
-                required
+                {...register('due_date', { valueAsDate: true })}
               />
+              {errors.due_date && (
+                <p className="text-sm text-red-600">{errors.due_date.message}</p>
+              )}
             </div>
           </div>
         </CardContent>
@@ -190,18 +175,17 @@ export function InvoiceForm({ onSuccess }: InvoiceFormProps) {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {formData.line_items.map((item, index) => (
-            <div key={index} className="grid grid-cols-12 gap-3 items-end">
+          {fields.map((field, index) => (
+            <div key={field.id} className="grid grid-cols-12 gap-3 items-end">
               <div className="col-span-5 space-y-2">
                 {index === 0 && <Label>Description</Label>}
                 <Input
-                  value={item.description}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    updateLineItem(index, 'description', e.target.value)
-                  }
+                  {...register(`line_items.${index}.description`)}
                   placeholder="Item description"
-                  required
                 />
+                {errors.line_items?.[index]?.description && (
+                  <p className="text-sm text-red-600">{errors.line_items[index]?.description?.message}</p>
+                )}
               </div>
               
               <div className="col-span-2 space-y-2">
@@ -209,12 +193,11 @@ export function InvoiceForm({ onSuccess }: InvoiceFormProps) {
                 <Input
                   type="number"
                   min="1"
-                  value={item.quantity}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    updateLineItem(index, 'quantity', parseInt(e.target.value) || 1)
-                  }
-                  required
+                  {...register(`line_items.${index}.quantity`, { valueAsNumber: true })}
                 />
+                {errors.line_items?.[index]?.quantity && (
+                  <p className="text-sm text-red-600">{errors.line_items[index]?.quantity?.message}</p>
+                )}
               </div>
               
               <div className="col-span-2 space-y-2">
@@ -223,23 +206,22 @@ export function InvoiceForm({ onSuccess }: InvoiceFormProps) {
                   type="number"
                   min="0"
                   step="0.01"
-                  value={item.unit_price}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    updateLineItem(index, 'unit_price', parseFloat(e.target.value) || 0)
-                  }
-                  required
+                  {...register(`line_items.${index}.unit_price`, { valueAsNumber: true })}
                 />
+                {errors.line_items?.[index]?.unit_price && (
+                  <p className="text-sm text-red-600">{errors.line_items[index]?.unit_price?.message}</p>
+                )}
               </div>
               
               <div className="col-span-2 space-y-2">
                 {index === 0 && <Label>Total</Label>}
                 <div className="h-10 px-3 py-2 border rounded-md bg-gray-50 text-sm flex items-center">
-                  ${(item.quantity * item.unit_price).toFixed(2)}
+                  ${((watchedLineItems[index]?.quantity || 0) * (watchedLineItems[index]?.unit_price || 0)).toFixed(2)}
                 </div>
               </div>
               
               <div className="col-span-1 flex justify-center">
-                {formData.line_items.length > 1 && (
+                {fields.length > 1 && (
                   <Button
                     type="button"
                     variant="ghost"
@@ -253,6 +235,11 @@ export function InvoiceForm({ onSuccess }: InvoiceFormProps) {
               </div>
             </div>
           ))}
+          
+          {/* Line Items Errors */}
+          {errors.line_items && typeof errors.line_items === 'object' && 'message' in errors.line_items && (
+            <p className="text-sm text-red-600">{errors.line_items.message}</p>
+          )}
           
           {/* Total Section */}
           <div className="border-t pt-4 mt-6">
@@ -271,10 +258,10 @@ export function InvoiceForm({ onSuccess }: InvoiceFormProps) {
       <div className="flex justify-end space-x-3">
         <Button 
           type="submit" 
-          disabled={isLoading || !formData.client_name || formData.line_items.some(item => !item.description)}
+          disabled={isSubmitting}
           className="bg-gray-900 hover:bg-gray-800 text-white px-8"
         >
-          {isLoading ? 'Creating Invoice...' : 'Create Invoice'}
+          {isSubmitting ? 'Creating Invoice...' : 'Create Invoice'}
         </Button>
       </div>
     </form>

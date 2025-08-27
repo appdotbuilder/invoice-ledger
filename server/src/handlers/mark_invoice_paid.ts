@@ -1,11 +1,10 @@
 import { db } from '../db';
 import { invoicesTable } from '../db/schema';
-import { type MarkInvoicePaidInput, type Invoice } from '../schema';
 import { eq } from 'drizzle-orm';
+import { type MarkInvoicePaidInput, type Invoice } from '../schema';
 
 export const markInvoicePaid = async (input: MarkInvoicePaidInput): Promise<Invoice> => {
   try {
-    // Update the invoice payment status to 'paid' and updated_at timestamp
     const result = await db.update(invoicesTable)
       .set({
         payment_status: 'paid',
@@ -15,19 +14,19 @@ export const markInvoicePaid = async (input: MarkInvoicePaidInput): Promise<Invo
       .returning()
       .execute();
 
-    // Check if invoice was found and updated
     if (result.length === 0) {
       throw new Error(`Invoice with id ${input.id} not found`);
     }
 
-    // Convert numeric fields back to numbers before returning
     const invoice = result[0];
+
+    // Convert numeric fields back to numbers before returning
     return {
       ...invoice,
-      total_amount: parseFloat(invoice.total_amount) // Convert string back to number
+      total_amount: parseFloat(invoice.total_amount)
     };
   } catch (error) {
-    console.error('Mark invoice paid failed:', error);
+    console.error('Failed to mark invoice as paid:', error);
     throw error;
   }
 };

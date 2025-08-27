@@ -55,7 +55,10 @@ const appRouter = router({
 
   deleteInvoice: publicProcedure
     .input(z.object({ id: z.number() }))
-    .mutation(({ input }) => deleteInvoice(input.id)),
+    .mutation(async ({ input }) => {
+      const success = await deleteInvoice(input.id);
+      return { success };
+    }),
 });
 
 export type AppRouter = typeof appRouter;

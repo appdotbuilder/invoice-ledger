@@ -1,12 +1,14 @@
 import { db } from '../db';
 import { invoicesTable, lineItemsTable } from '../db/schema';
 import { type CreateInvoiceInput, type InvoiceWithLineItems } from '../schema';
-import { eq } from 'drizzle-orm';
 
 export const createInvoice = async (input: CreateInvoiceInput): Promise<InvoiceWithLineItems> => {
   try {
     // Calculate total amount from line items
-    const totalAmount = input.line_items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
+    const totalAmount = input.line_items.reduce(
+      (sum, item) => sum + (item.quantity * item.unit_price),
+      0
+    );
 
     // Insert invoice record
     const invoiceResult = await db.insert(invoicesTable)
@@ -16,21 +18,20 @@ export const createInvoice = async (input: CreateInvoiceInput): Promise<InvoiceW
         due_date: input.due_date,
         total_amount: totalAmount.toString(), // Convert number to string for numeric column
         payment_status: input.payment_status,
-        updated_at: new Date() // Set updated_at explicitly since we're creating
+        updated_at: new Date()
       })
       .returning()
       .execute();
 
     const invoice = invoiceResult[0];
 
-    // Insert line items with calculated totals
+    // Insert line items
     const lineItemsData = input.line_items.map(item => ({
       invoice_id: invoice.id,
       description: item.description,
       quantity: item.quantity,
       unit_price: item.unit_price.toString(), // Convert number to string for numeric column
-      total: (item.quantity * item.unit_price).toString(), // Convert calculated total to string
-      updated_at: new Date() // Set updated_at explicitly
+      total: (item.quantity * item.unit_price).toString() // Convert number to string for numeric column
     }));
 
     const lineItemsResult = await db.insert(lineItemsTable)
@@ -38,14 +39,14 @@ export const createInvoice = async (input: CreateInvoiceInput): Promise<InvoiceW
       .returning()
       .execute();
 
-    // Convert numeric fields back to numbers and return complete invoice with line items
+    // Convert numeric fields back to numbers before returning
     return {
       ...invoice,
-      total_amount: parseFloat(invoice.total_amount), // Convert string back to number
+      total_amount: parseFloat(invoice.total_amount),
       line_items: lineItemsResult.map(item => ({
         ...item,
-        unit_price: parseFloat(item.unit_price), // Convert string back to number
-        total: parseFloat(item.total) // Convert string back to number
+        unit_price: parseFloat(item.unit_price),
+        total: parseFloat(item.total)
       }))
     };
   } catch (error) {
