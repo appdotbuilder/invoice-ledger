@@ -1,22 +1,33 @@
+import { db } from '../db';
+import { invoicesTable } from '../db/schema';
 import { type MarkInvoicePaidInput, type Invoice } from '../schema';
+import { eq } from 'drizzle-orm';
 
-export async function markInvoicePaid(input: MarkInvoicePaidInput): Promise<Invoice> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is marking a specific invoice as paid.
-    // Steps to implement:
-    // 1. Find the invoice by ID
-    // 2. Update payment_status to 'paid'
-    // 3. Update updated_at timestamp
-    // 4. Return the updated invoice
-    
-    return Promise.resolve({
-        id: input.id,
-        client_name: 'Placeholder Client',
-        date: new Date(),
-        due_date: new Date(),
-        total_amount: 0,
-        payment_status: 'paid', // Mark as paid
-        created_at: new Date(),
+export const markInvoicePaid = async (input: MarkInvoicePaidInput): Promise<Invoice> => {
+  try {
+    // Update the invoice payment status to 'paid' and updated_at timestamp
+    const result = await db.update(invoicesTable)
+      .set({
+        payment_status: 'paid',
         updated_at: new Date()
-    } as Invoice);
-}
+      })
+      .where(eq(invoicesTable.id, input.id))
+      .returning()
+      .execute();
+
+    // Check if invoice was found and updated
+    if (result.length === 0) {
+      throw new Error(`Invoice with id ${input.id} not found`);
+    }
+
+    // Convert numeric fields back to numbers before returning
+    const invoice = result[0];
+    return {
+      ...invoice,
+      total_amount: parseFloat(invoice.total_amount) // Convert string back to number
+    };
+  } catch (error) {
+    console.error('Mark invoice paid failed:', error);
+    throw error;
+  }
+};

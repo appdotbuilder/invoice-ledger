@@ -1,9 +1,19 @@
-export async function deleteInvoice(id: number): Promise<boolean> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is deleting an invoice and all its associated line items.
-    // Steps to implement:
-    // 1. Delete the invoice by ID (cascade delete will handle line items due to FK constraint)
-    // 2. Return true if deletion was successful, false otherwise
-    
-    return Promise.resolve(true); // Placeholder success response
-}
+import { db } from '../db';
+import { invoicesTable } from '../db/schema';
+import { eq } from 'drizzle-orm';
+
+export const deleteInvoice = async (id: number): Promise<boolean> => {
+  try {
+    // Delete the invoice by ID (cascade delete will handle line items due to FK constraint)
+    const result = await db.delete(invoicesTable)
+      .where(eq(invoicesTable.id, id))
+      .returning({ id: invoicesTable.id })
+      .execute();
+
+    // Return true if deletion was successful (at least one row was deleted)
+    return result.length > 0;
+  } catch (error) {
+    console.error('Invoice deletion failed:', error);
+    throw error;
+  }
+};

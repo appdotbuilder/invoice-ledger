@@ -1,32 +1,55 @@
+import { db } from '../db';
+import { invoicesTable, lineItemsTable } from '../db/schema';
 import { type CreateInvoiceInput, type InvoiceWithLineItems } from '../schema';
+import { eq } from 'drizzle-orm';
 
-export async function createInvoice(input: CreateInvoiceInput): Promise<InvoiceWithLineItems> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is creating a new invoice with line items persisting them in the database.
-    // Steps to implement:
-    // 1. Calculate total amount from line items (quantity * unit_price for each item)
-    // 2. Insert invoice into invoices table
-    // 3. Insert all line items into line_items table with the invoice_id
-    // 4. Return the complete invoice with line items
-    
+export const createInvoice = async (input: CreateInvoiceInput): Promise<InvoiceWithLineItems> => {
+  try {
+    // Calculate total amount from line items
     const totalAmount = input.line_items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
-    
-    return Promise.resolve({
-        id: 0, // Placeholder ID
+
+    // Insert invoice record
+    const invoiceResult = await db.insert(invoicesTable)
+      .values({
         client_name: input.client_name,
         date: input.date,
         due_date: input.due_date,
-        total_amount: totalAmount,
+        total_amount: totalAmount.toString(), // Convert number to string for numeric column
         payment_status: input.payment_status,
-        created_at: new Date(),
-        updated_at: new Date(),
-        line_items: input.line_items.map((item, index) => ({
-            id: index + 1, // Placeholder ID
-            invoice_id: 0, // Placeholder invoice ID
-            description: item.description,
-            quantity: item.quantity,
-            unit_price: item.unit_price,
-            total: item.quantity * item.unit_price
-        }))
-    } as InvoiceWithLineItems);
-}
+        updated_at: new Date() // Set updated_at explicitly since we're creating
+      })
+      .returning()
+      .execute();
+
+    const invoice = invoiceResult[0];
+
+    // Insert line items with calculated totals
+    const lineItemsData = input.line_items.map(item => ({
+      invoice_id: invoice.id,
+      description: item.description,
+      quantity: item.quantity,
+      unit_price: item.unit_price.toString(), // Convert number to string for numeric column
+      total: (item.quantity * item.unit_price).toString(), // Convert calculated total to string
+      updated_at: new Date() // Set updated_at explicitly
+    }));
+
+    const lineItemsResult = await db.insert(lineItemsTable)
+      .values(lineItemsData)
+      .returning()
+      .execute();
+
+    // Convert numeric fields back to numbers and return complete invoice with line items
+    return {
+      ...invoice,
+      total_amount: parseFloat(invoice.total_amount), // Convert string back to number
+      line_items: lineItemsResult.map(item => ({
+        ...item,
+        unit_price: parseFloat(item.unit_price), // Convert string back to number
+        total: parseFloat(item.total) // Convert string back to number
+      }))
+    };
+  } catch (error) {
+    console.error('Invoice creation failed:', error);
+    throw error;
+  }
+};
