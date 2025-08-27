@@ -1,17 +1,21 @@
 import { db } from '../db';
-import { invoicesTable } from '../db/schema';
+import { invoicesTable, lineItemsTable } from '../db/schema';
 import { eq } from 'drizzle-orm';
 
 export const deleteInvoice = async (id: number): Promise<boolean> => {
   try {
-    // Delete invoice (line items will be deleted automatically due to CASCADE)
-    const result = await db.delete(invoicesTable)
-      .where(eq(invoicesTable.id, id))
-      .returning()
+    // Delete line items first (cascade should handle this, but being explicit)
+    await db.delete(lineItemsTable)
+      .where(eq(lineItemsTable.invoice_id, id))
       .execute();
 
-    // Return true if at least one row was deleted, false otherwise
-    return result.length > 0;
+    // Delete invoice
+    const result = await db.delete(invoicesTable)
+      .where(eq(invoicesTable.id, id))
+      .execute();
+
+    // Check if any rows were affected to determine if invoice existed
+    return (result.rowCount ?? 0) > 0;
   } catch (error) {
     console.error('Failed to delete invoice:', error);
     throw error;

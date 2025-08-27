@@ -13,7 +13,7 @@ export const getInvoices = async (): Promise<Invoice[]> => {
     // Convert numeric fields back to numbers before returning
     return results.map(invoice => ({
       ...invoice,
-      total_amount: parseFloat(invoice.total_amount)
+      total_amount: parseFloat(invoice.total_amount) // Convert string back to number
     }));
   } catch (error) {
     console.error('Failed to get invoices:', error);

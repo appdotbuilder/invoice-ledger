@@ -17,8 +17,7 @@ export const createInvoice = async (input: CreateInvoiceInput): Promise<InvoiceW
         date: input.date,
         due_date: input.due_date,
         total_amount: totalAmount.toString(), // Convert number to string for numeric column
-        payment_status: input.payment_status,
-        updated_at: new Date()
+        payment_status: input.payment_status
       })
       .returning()
       .execute();
@@ -42,11 +41,11 @@ export const createInvoice = async (input: CreateInvoiceInput): Promise<InvoiceW
     // Convert numeric fields back to numbers before returning
     return {
       ...invoice,
-      total_amount: parseFloat(invoice.total_amount),
+      total_amount: parseFloat(invoice.total_amount), // Convert string back to number
       line_items: lineItemsResult.map(item => ({
         ...item,
-        unit_price: parseFloat(item.unit_price),
-        total: parseFloat(item.total)
+        unit_price: parseFloat(item.unit_price), // Convert string back to number
+        total: parseFloat(item.total) // Convert string back to number
       }))
     };
   } catch (error) {

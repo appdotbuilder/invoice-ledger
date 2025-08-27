@@ -50,7 +50,6 @@ export function InvoiceForm({ onSuccess }: InvoiceFormProps) {
   const onSubmit = async (data: CreateInvoiceInput) => {
     try {
       await trpc.createInvoice.mutate(data);
-      toast.success('Invoice created successfully!');
       onSuccess();
       reset();
     } catch (error) {

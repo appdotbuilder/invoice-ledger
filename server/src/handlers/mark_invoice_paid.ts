@@ -6,7 +6,7 @@ import { type MarkInvoicePaidInput, type Invoice } from '../schema';
 export const markInvoicePaid = async (input: MarkInvoicePaidInput): Promise<Invoice> => {
   try {
     const result = await db.update(invoicesTable)
-      .set({
+      .set({ 
         payment_status: 'paid',
         updated_at: new Date()
       })
@@ -18,12 +18,11 @@ export const markInvoicePaid = async (input: MarkInvoicePaidInput): Promise<Invo
       throw new Error(`Invoice with id ${input.id} not found`);
     }
 
-    const invoice = result[0];
-
     // Convert numeric fields back to numbers before returning
+    const invoice = result[0];
     return {
       ...invoice,
-      total_amount: parseFloat(invoice.total_amount)
+      total_amount: parseFloat(invoice.total_amount) // Convert string back to number
     };
   } catch (error) {
     console.error('Failed to mark invoice as paid:', error);
